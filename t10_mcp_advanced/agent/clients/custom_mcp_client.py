@@ -1,17 +1,21 @@
+import base64
 import json
 import uuid
 from typing import Optional, Any
 import aiohttp
 
 
-MCP_SESSION_ID_HEADER = "Mcp-Session-Id"
+PROTOCOL_VERSION = "2026-07-28"
+CLIENT_INFO = {
+    "name": "my-custom-mcp-client",
+    "version": "1.0.0"
+}
 
 class CustomMCPClient:
-    """Pure Python MCP client without external MCP libraries"""
+    """Pure Python MCP client without external MCP libraries (stateless MCP, protocol version 2026-07-28)"""
 
     def __init__(self, mcp_server_url: str) -> None:
         self.server_url = mcp_server_url
-        self.session_id: Optional[str] = None
         self.http_session: Optional[aiohttp.ClientSession] = None
 
     @classmethod
@@ -21,91 +25,80 @@ class CustomMCPClient:
         await instance.connect()
         return instance
 
+    @staticmethod
+    def _encode_header_value(value: str) -> str:
+        """Header values must be plain visible ASCII, otherwise they are sent as `=?base64?{value}?=`"""
+        is_plain_ascii = value.isascii() and value.isprintable() and value == value.strip()
+        looks_like_base64_sentinel = value.startswith("=?base64?") and value.endswith("?=")
+        if is_plain_ascii and not looks_like_base64_sentinel:
+            return value
+        return f"=?base64?{base64.b64encode(value.encode('utf-8')).decode('ascii')}?="
+
     async def _send_request(self, method: str, params: Optional[dict[str, Any]] = None) -> dict[str, Any]:
         """Send JSON-RPC request to MCP server"""
         #TODO:
         # 1. Check session is present
         # 2. Prepare request body and don't forget to add parameters there if they are present. Sample of request body see in Postman collection
+        #    There is no session, so `params` of every request must contain `_meta` with:
+        #       - "io.modelcontextprotocol/protocolVersion": PROTOCOL_VERSION
+        #       - "io.modelcontextprotocol/clientInfo": CLIENT_INFO
+        #       - "io.modelcontextprotocol/clientCapabilities": {}
         # 3. Prepare headers dict. Remember that according to protocol MCP Server Accept application/json and text/event-stream
-        # 4. Add session ID header for non-initialize requests (notify, discovery, operation):
+        #    Protocol version and method must be mirrored into `MCP-Protocol-Version` and `Mcp-Method` headers
+        # 4. For `tools/call` add `Mcp-Name` header with tool name (use `self._encode_header_value`)
         # 5. Make POST request using `self.http_session.post()` as `response` with:
         #       - url: self.server_url
         #       - json: request_data
         #       - headers: headers
         #    And:
-        #       - If `not self.session_id` and `response.headers.get(MCP_SESSION_ID_HEADER)` exists, set `self.session_id = response.headers[MCP_SESSION_ID_HEADER]`
-        #       - If `response.status == 202`, return empty dict `{}` (successful notification)
-        #       - Get `content-type` from response headers
-        #       - If `'text/event-stream' in content_type.lower()`:
+        #       - Get `content_type` from `response.headers.get('content-type', '').lower()`
+        #       - If `'text/event-stream' in content_type`:
         #           - call `await self._parse_sse_response_streaming(response)` and assign to `response_data`
-        #         Otherwise call `await response.json()` and assign to `response_data`
+        #       - Elif `'application/json' in content_type`:
+        #           - call `await response.json()` and assign to `response_data` (errors with 4xx status are also JSON)
+        #       - Otherwise raise RuntimeError(f"Unexpected response (HTTP {response.status}): {await response.text()}")
         #       - If "error" in `response_data`, extract `error = response_data["error"]` and raise RuntimeError(f"MCP Error {error['code']}: {error['message']}")
+        #       - If `resultType` of the result is not "complete" raise RuntimeError(f"Unsupported resultType: {result_type}")
         #       - Return `response_data`
         raise NotImplementedError()
-
 
     async def _parse_sse_response_streaming(self, response: aiohttp.ClientResponse) -> dict[str, Any]:
         """Parse Server-Sent Events response with streaming"""
         #TODO:
         # Response stream sample:
-        # data: {
-        #     "jsonrpc": "2.0",
-        #     "id": 1,
-        #     "result": {
-        #         "content": [
-        #             {
-        #                 "type": "text",
-        #                 "text": "some tool call result"
-        #             }
-        #         ]
-        #     }
-        # }
-        # data: [DONE]
+        # event: message
+        # data: {"jsonrpc": "2.0", "id": 1, "result": {"content": [{"type": "text", "text": "some tool call result"}], "resultType": "complete"}}
         # ---
         # 1. Make async loop from the `response.content`
         #       - create `line_str` from `line.decode('utf-8').strip()`
-        #       - if line is not present or starts with ':' skip iteration (with continue)
-        #       - if line starts with 'data: ' then:
-        #           - extract data part: `data_part = line[6:]` (remove 'data: ' prefix)
-        #           - If `data_part != '[DONE]'`, then `return json.loads(data_part)` (we just need first chunk since MCP tool returns response with 1 chunk)
-        # 2. raise RuntimeError("No valid data found in SSE response")
-
+        #       - if line doesn't start with 'data:' skip iteration (with continue). This skips empty lines, comments (`:`) and `event:` lines
+        #       - extract data part: `data_part = line_str[5:].strip()` (remove 'data:' prefix), if it is empty skip iteration
+        #       - in try block parse it: `message = json.loads(data_part)`, on json.JSONDecodeError skip iteration
+        #       - if "id" in `message`, return `message`. The server may send notifications (e.g. progress) before
+        #         the final response, only the response has `id`
+        # 2. raise RuntimeError("No JSON-RPC response found in SSE stream")
         raise NotImplementedError()
 
     async def connect(self) -> None:
-        """Connect to MCP server and initialize session"""
+        """Create HTTP session and discover MCP server (no handshake and no session in stateless MCP)"""
         #TODO:
         # 1. Set up aiohttp.ClientTimeout with `total=30, connect=10`
         # 2. Set up aiohttp.TCPConnector with `limit=100, limit_per_host=10`
-        # 2. Set up  HTTP session: aiohttp.ClientSession with `timeout=timeout, connector=connector`
-        # 3. Try-except block:
-        #       - Create `init_params` dictionary with:
-        #           - "protocolVersion": "2024-11-05"
-        #           - "capabilities": {"tools": {}}
-        #           - "clientInfo": {"name": "my-custom-mcp-client", "version": "1.0.0"}
-        #       - Call `await self._send_request("initialize", init_params)` and save result into variable (to print later capabilities of MCP Server)
-        #       - Call `await self._send_notification("notifications/initialized")`
-        #       - Print capabilities (from init request)
-        # 4. Catch Exception as `e` and raise RuntimeError(f"Failed to connect to MCP server: {e}")
+        # 3. Set up HTTP session: `self.http_session = aiohttp.ClientSession(timeout=timeout, connector=connector)`
+        # 4. Try-except block:
+        #       - Call `await self._send_request("server/discover")`, get "result" from response and assign to `discover_result`
+        #       - Get `supported_versions` from `discover_result.get("supportedVersions", [])`
+        #       - If PROTOCOL_VERSION not in `supported_versions` raise
+        #         RuntimeError(f"Server doesn't support {PROTOCOL_VERSION}, supported versions: {supported_versions}")
+        #       - Print `discover_result` (capabilities and info of MCP Server): `print(json.dumps(discover_result, indent=2))`
+        # 5. Catch Exception as `e`, call `await self.close()` and raise RuntimeError(f"Failed to connect to MCP server: {e}")
         raise NotImplementedError()
 
-    async def _send_notification(self, method: str) -> None:
-        """Send notification (no response expected)"""
-        #TODO:
-        # 1. Check if `self.http_session` is None, raise RuntimeError("HTTP session not initialized")
-        # 2. Create `request_data` dictionary with:
-        #       - "jsonrpc": "2.0"
-        #       - "method": method
-        # 3. Create `headers` dictionary with:
-        #       - "Content-Type": "application/json"
-        #       - "Accept": "application/json, text/event-stream" (Pay attention that it required both!)
-        # 4. If `self.session_id` exists, add `headers[MCP_SESSION_ID_HEADER] = self.session_id`
-        # 5. Make async POST request using `self.http_session.post()` as `response` with:
-        #       - url: self.server_url
-        #       - json: request_data
-        #       - headers: headers
-        #    If MCP_SESSION_ID_HEADER exists in `response.headers`, set `self.session_id = response.headers[MCP_SESSION_ID_HEADER]` and print session ID
-        raise NotImplementedError()
+    async def close(self) -> None:
+        """Close HTTP session"""
+        if self.http_session:
+            await self.http_session.close()
+            self.http_session = None
 
     async def get_tools(self) -> list[dict[str, Any]]:
         """Get available tools from MCP server"""
@@ -136,7 +129,9 @@ class CustomMCPClient:
         #                       "type": "text",
         #                       "text": "some tool call result"
         #                   }
-        #                ]
+        #                ],
+        #               "isError": false,
+        #               "resultType": "complete"
         #           }
         #       }
         # 5. Extract content using walrus operator: `if content:= response["result"].get("content", [])`
