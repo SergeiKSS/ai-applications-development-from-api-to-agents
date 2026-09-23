@@ -4,7 +4,8 @@ from t11_mcp_auth.mcp_server._server import mcp
 from t11_mcp_auth.mcp_server.auth.api_key_auth import APIKeyMiddleware
 
 #TODO:
-# 1. Create the Starlette app by calling `mcp.streamable_http_app()` and assign to `app`
+# 1. Create the stateless Starlette app by calling `mcp.http_app(stateless_http=True)` and assign to `app`
+#    (no sessions: every request is authenticated and processed on its own)
 # 2. Add `APIKeyMiddleware` to the app
 raise NotImplementedError()
 

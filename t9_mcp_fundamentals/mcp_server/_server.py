@@ -1,15 +1,14 @@
 from pathlib import Path
 
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 
 from commons.user_service.client import UserServiceClient
 from commons.user_service.user_info import UserSearchRequest, UserCreate, UserUpdate
 
 #TODO:
 # 1. Create instance of FastMCP as `mcp` (or another name if you wish) with:
-#       - name is "users-management-mcp-server",
-#       - host is "0.0.0.0",
-#       - port is 8005,
+#       - name is "users-management-mcp-server"
+#    (host and port are not set here, they are passed to `mcp.run()` in `http_server.py`)
 # 2. Create UserServiceClient
 
 
