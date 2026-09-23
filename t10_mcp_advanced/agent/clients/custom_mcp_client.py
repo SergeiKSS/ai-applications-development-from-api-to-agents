@@ -38,7 +38,7 @@ class CustomMCPClient:
         """Send JSON-RPC request to MCP server"""
         #TODO:
         # 1. Check session is present
-        # 2. Prepare request body and don't forget to add parameters there if they are present. Sample of request body see in Postman collection
+        # 2. Prepare request body and don't forget to add parameters there if they are present. Sample of request body see in README (MCP Protocol Details -> Request Format)
         #    There is no session, so `params` of every request must contain `_meta` with:
         #       - "io.modelcontextprotocol/protocolVersion": PROTOCOL_VERSION
         #       - "io.modelcontextprotocol/clientInfo": CLIENT_INFO
@@ -105,7 +105,7 @@ class CustomMCPClient:
         #TODO:
         # 1. Check if session is present
         # 2. Send request with method `tools/list`
-        # 3. Extract tools from response. See response sample in postman
+        # 3. Extract tools from response. See response sample in the spec: https://modelcontextprotocol.io/specification/2026-07-28/server/tools#listing-tools
         # 4. Return list with dicts with tool schemas. It should be provided according to OpenAI specification
         # https://platform.openai.com/docs/guides/function-calling#defining-functions
         raise NotImplementedError()
