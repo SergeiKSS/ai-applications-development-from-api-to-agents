@@ -4,7 +4,7 @@ from pathlib import Path
 
 from openai import OpenAI
 
-from commons.constants import OPENAI_API_KEY
+from commons.constants import OPENAI_API_KEY, OPENAI_TERRA_MODEL
 from commons.models.message import Message
 from commons.models.role import Role
 from t12_skills.custom.agent import T12Agent
@@ -71,7 +71,7 @@ async def main():
     # - Build the tools list:
     #   - ReadSkillTool (pass SKILLS_DIR)
     #   - PythonCodeInterpreterTool (use async factory .create() with MCP_URL, MCP_TOOL_NAME, SKILLS_DIR)
-    # - Create a T12Agent with an OpenAI client, model "gpt-5.2", and the tools list
+    # - Create a T12Agent with an OpenAI client, model OPENAI_TERRA_MODEL, and the tools list
     # - Run a chat loop: read user input, break on "exit",
     #   append USER message, call agent.chat_completion, append the returned assistant message
     raise NotImplementedError()

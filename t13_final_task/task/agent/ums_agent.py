@@ -34,6 +34,7 @@ class UMSAgent:
         """Non-streaming completion with tool calling support"""
         #TODO:
         # 1. Build request_data: model, messages (each .to_dict()), tools schemas, stream=False
+        #    (if you use a GPT-5.6 model, also add reasoning_effort="none": it supports function tools in Chat Completions only without reasoning)
         # 2. Call async_openai chat completions with request_data
         # 3. Build ai_message (Role.ASSISTANT) from response content
         # 4. If response has tool_calls, assign them to ai_message.tool_calls

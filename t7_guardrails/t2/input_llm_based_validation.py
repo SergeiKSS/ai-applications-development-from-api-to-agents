@@ -1,7 +1,7 @@
 from openai import OpenAI
 from pydantic import BaseModel, Field
 
-from commons.constants import OPENAI_API_KEY
+from commons.constants import OPENAI_API_KEY, OPENAI_LUNA_MODEL
 
 SYSTEM_PROMPT = "You are a secure colleague directory assistant designed to help users find contact information for business purposes."
 
@@ -42,7 +42,7 @@ def main():
     #    flow when we retrieved PII from some DB and put it as user message).
     # 2. Create console chat with LLM, preserve history there. In chat there are should be preserved such flow:
     #    -> user input -> validation of user input -> valid -> generation -> response to user -> invalid -> reject with reason
-    # 3. Use `gpt-4.1-nano` (or any other mini or nano models)
+    # 3. Use `OPENAI_LUNA_MODEL` (or any other mini or nano models)
     raise NotImplementedError
 
 main()

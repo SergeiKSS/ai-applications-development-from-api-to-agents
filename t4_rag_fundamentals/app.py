@@ -8,7 +8,7 @@ from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pydantic import SecretStr
 
-from commons.constants import OPENAI_API_KEY
+from commons.constants import OPENAI_API_KEY, OPENAI_EMBEDDINGS_MODEL, OPENAI_TERRA_MODEL
 
 #TODO:
 # Create system prompt with:
@@ -125,6 +125,6 @@ def main(rag: MicrowaveRAG):
 
 #TODO:
 # Start the application by calling main() and passing a MicrowaveRAG instance:
-# - Create OpenAIEmbeddings with model='text-embedding-3-small' and api_key=OPENAI_API_KEY
-# - Create ChatOpenAI with temperature=0.0, model='gpt-5.2' and api_key=OPENAI_API_KEY
+# - Create OpenAIEmbeddings with model=OPENAI_EMBEDDINGS_MODEL and api_key=OPENAI_API_KEY
+# - Create ChatOpenAI with temperature=0.0, reasoning_effort="none", model=OPENAI_TERRA_MODEL and api_key=OPENAI_API_KEY
 # - Wrap both in a MicrowaveRAG instance and pass it to main()

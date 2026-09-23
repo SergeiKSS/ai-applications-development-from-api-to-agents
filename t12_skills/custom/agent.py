@@ -25,7 +25,8 @@ class T12Agent:
 
     async def _chat_completion(self, messages: list[Message], log_messages: bool = False) -> Message:
         #TODO:
-        # - Build a request dict with model, messages (convert each to dict), and tools schemas
+        # - Build a request dict with model, messages (convert each to dict), tools schemas, and
+        #   reasoning_effort="none" (GPT-5.6 supports function tools in Chat Completions only without reasoning)
         # - Call self._client.chat.completions.create and get the first choice
         # - Create an assistant Message with empty content
         # - If choice.message.content is set, assign it to the assistant message

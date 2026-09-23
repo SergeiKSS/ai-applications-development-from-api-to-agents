@@ -1,6 +1,7 @@
 import json
 
 import requests
+from commons.constants import OPENAI_EMBEDDINGS_MODEL
 
 
 
@@ -48,7 +49,7 @@ class EmbeddingsClient:
 #   -H "Authorization: Bearer $OPENAI_API_KEY" \
 #   -d '{
 #     "input": "Your text string goes here",
-#     "model": "text-embedding-3-small",
+#     "model": OPENAI_EMBEDDINGS_MODEL,
 #     "dimensions": 384
 #   }'
 #

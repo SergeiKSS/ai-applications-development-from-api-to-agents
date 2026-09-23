@@ -27,7 +27,8 @@ class OpenAIBasedAgent(BaseAgent):
         #    Message(role=Role.SYSTEM, content=self._system_prompt) to `messages` —
         #    do NOT store it in `messages` itself (local to this API call only)
         # 2. Build headers: `Authorization: self._api_key`, `Content-Type: application/json`
-        # 3. Build request_data with `model`, serialized `request_messages` (.to_dict()), and `tools`
+        # 3. Build request_data with `model`, serialized `request_messages` (.to_dict()), `tools`, and
+        #    `reasoning_effort="none"` (GPT-5.6 supports function tools in Chat Completions only without reasoning)
         # 4. If `print_request` — print `self._endpoint` and the REQUEST payload
         # 5. POST to `self._endpoint` with headers and json body
         # 6. On HTTP 200:

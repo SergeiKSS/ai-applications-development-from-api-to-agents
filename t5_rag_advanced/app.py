@@ -1,4 +1,4 @@
-from commons.constants import OPENAI_API_KEY, OPENAI_EMBEDDINGS_ENDPOINT, OPENAI_CHAT_COMPLETIONS_ENDPOINT
+from commons.constants import OPENAI_API_KEY, OPENAI_EMBEDDINGS_ENDPOINT, OPENAI_CHAT_COMPLETIONS_ENDPOINT, OPENAI_EMBEDDINGS_MODEL, OPENAI_TERRA_MODEL
 from commons.models.conversation import Conversation
 from commons.models.message import Message
 from commons.models.role import Role
@@ -20,8 +20,8 @@ USER_PROMPT = """
 """
 
 #TODO:
-# - create embeddings client with 'text-embedding-3-small' model, OPENAI_EMBEDDINGS_ENDPOINT endpoint and OPENAI_API_KEY
-# - create chat completion client with 'gpt-5.2' model, OPENAI_CHAT_COMPLETIONS_ENDPOINT endpoint and OPENAI_API_KEY
+# - create embeddings client with OPENAI_EMBEDDINGS_MODEL model, OPENAI_EMBEDDINGS_ENDPOINT endpoint and OPENAI_API_KEY
+# - create chat completion client with OPENAI_TERRA_MODEL model, OPENAI_CHAT_COMPLETIONS_ENDPOINT endpoint and OPENAI_API_KEY
 # - create text processor, DB config: {'host': 'localhost','port': 5433,'database': 'vectordb','user': 'postgres','password': 'postgres'}
 # ---
 # Create method that will run console chat with such steps:

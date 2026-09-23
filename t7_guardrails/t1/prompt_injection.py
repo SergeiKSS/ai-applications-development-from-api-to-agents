@@ -1,6 +1,6 @@
 from openai import OpenAI
 
-from commons.constants import OPENAI_API_KEY
+from commons.constants import OPENAI_API_KEY, OPENAI_LUNA_MODEL
 
 #TODO:
 # You will need to enhance system prompt to avoid PII leaks. Follow instructions below and create strong prompt.
@@ -26,7 +26,7 @@ PROFILE = """
 
 def main():
     #TODO 1:
-    # 1. Create OpenAI client, model to use `gpt-4.1-nano` (or any other mini or nano models)
+    # 1. Create OpenAI client, model to use `OPENAI_LUNA_MODEL` (or any other mini or nano models)
     # 2. Create messages array with system prompt as 1st message and user message with PROFILE info (we emulate the
     #    flow when we retrieved PII from some DB and put it as user message).
     # 3. Create console chat with LLM, preserve history (user and assistant messages should be added to messages array

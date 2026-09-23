@@ -4,7 +4,7 @@ from presidio_analyzer import AnalyzerEngine
 from presidio_analyzer.nlp_engine import NlpEngineProvider
 from presidio_anonymizer import AnonymizerEngine
 
-from commons.constants import OPENAI_API_KEY
+from commons.constants import OPENAI_API_KEY, OPENAI_LUNA_MODEL
 
 
 class PresidioStreamingPIIGuardrail:
@@ -143,7 +143,7 @@ def main():
     # 4. Console chat loop:
     #    - Read user input; exit on "exit"
     #    - Append user message to messages
-    #    - Call client.chat.completions.create(..., stream=True) with model 'gpt-4.1-nano'
+    #    - Call client.chat.completions.create(..., stream=True) with model OPENAI_LUNA_MODEL
     #    - For each chunk: call guardrail.process_chunk(content), print any returned safe text
     #    - After the loop: call guardrail.finalize(), print any remaining safe text
     #    - Append the accumulated full_response as an assistant message to preserve history

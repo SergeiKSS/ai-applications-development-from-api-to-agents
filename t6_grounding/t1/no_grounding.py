@@ -3,7 +3,7 @@ from typing import Any
 
 from openai import AsyncOpenAI
 
-from commons.constants import OPENAI_API_KEY
+from commons.constants import OPENAI_API_KEY, OPENAI_LUNA_MODEL
 from t6_grounding.user_service_client import UserServiceClient
 
 #TODO:
@@ -73,8 +73,9 @@ async def generate_response(system_prompt: str, user_message: str) -> str:
     #TODO:
     # - Build a messages list with a system role entry and a user role entry
     # - Call llm_client.chat.completions.create with:
-    #   - model='gpt-4.1-nano'
+    #   - model=OPENAI_LUNA_MODEL
     #   - temperature=0.0
+    #   - reasoning_effort="none" (GPT-5.6 accepts a non-default temperature only without reasoning)
     #   - messages=messages
     # - Extract total_tokens from response.usage (default to 0 if usage is None)
     # - Track tokens using token_tracker.add_tokens(...)
