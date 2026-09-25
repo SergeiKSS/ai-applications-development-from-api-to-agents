@@ -2,7 +2,7 @@ import json
 
 import requests
 
-from commons.constants import ANTHROPIC_ENDPOINT, ANTHROPIC_API_KEY
+from commons.constants import ANTHROPIC_ENDPOINT, ANTHROPIC_API_KEY, ANTHROPIC_WORKSPACE_ID
 from t2_llms_output_tuning._clients._base_client import AIClient
 from commons.models.message import Message
 from commons.models.role import Role
@@ -30,6 +30,9 @@ class AnthropicAIClient(AIClient):
             "Content-Type": "application/json",
             "anthropic-version": "2023-06-01"
         }
+        # Required only for API keys that are not scoped to a workspace
+        if ANTHROPIC_WORKSPACE_ID:
+            headers["anthropic-workspace-id"] = ANTHROPIC_WORKSPACE_ID
         request_data = {
             "model": self._model_name,
             "max_tokens": kwargs.get("max_tokens", 1024),

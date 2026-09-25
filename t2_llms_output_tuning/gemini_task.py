@@ -38,7 +38,14 @@ from commons.constants import GEMINI_FLASH_MODEL
 run(
     client=GeminiAIClient(GEMINI_FLASH_MODEL),
     print_request=True, # Switch to False if you do not want to see the request in console
-    print_only_content=False, # Switch to True if you want to see only content from response
-
-
+    print_only_content=True, # Switch to True if you want to see only content from response
+    # generationConfig={
+        # "temperature": 2.0,
+        # "topP": 0.95,
+        # "topK": 64,
+        # "maxOutputTokens": 2048,
+        # "responseMimeType": "application/json",
+        # "responseSchema": {"type": "array", "items": {"type": "object", "properties": {"name": {"type": "string"}, "year": {"type": "integer"}}}},
+        # "thinkingConfig": {"thinkingBudget": 5000, "includeThoughts": True},
+    # },
 )

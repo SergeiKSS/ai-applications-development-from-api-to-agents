@@ -16,7 +16,7 @@ DEFAULT_SYSTEM_PROMPT = "You are an assistant who answers concisely and informat
 # OPENAI_HOST = "https://api.openai.com"
 OPENAI_HOST = "https://ai-proxy.lab.epam.com"
 # OPENAI_CHAT_COMPLETIONS_ENDPOINT = f"{OPENAI_HOST}/v1/chat/completions"
-OPENAI_CHAT_COMPLETIONS_ENDPOINT = f"{OPENAI_HOST}/openai/deployments/gpt-5.6-terra-2026-07-09"
+OPENAI_CHAT_COMPLETIONS_ENDPOINT = f"{OPENAI_HOST}/openai/deployments/gpt-5.6-terra-2026-07-09/chat/completions"
 # OPENAI_RESPONSES_ENDPOINT = f"{OPENAI_HOST}/v1/responses"
 OPENAI_RESPONSES_ENDPOINT = f"{OPENAI_HOST}/openai/v1/responses"
 OPENAI_EMBEDDINGS_ENDPOINT = f"{OPENAI_HOST}/v1/embeddings"
@@ -42,7 +42,8 @@ ANTHROPIC_HAIKU_MODEL = "claude-haiku-4-5"
 # Google Gemini API configuration
 GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models"
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
-GEMINI_FLASH_MODEL = "gemini-3-flash-preview"
+# GEMINI_FLASH_MODEL = "gemini-3-flash-preview"
+GEMINI_FLASH_MODEL = "gemini-3.5-flash-lite"
 
 # User Service API configuration
 USER_SERVICE_ENDPOINT = "http://localhost:8041"
