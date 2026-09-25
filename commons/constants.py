@@ -32,6 +32,8 @@ OPENAI_EMBEDDINGS_MODEL = "text-embedding-3-small"
 # Anthropic API configuration
 ANTHROPIC_ENDPOINT = "https://api.anthropic.com/v1/messages"
 ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY', '')
+# Required only for API keys that are not scoped to a workspace
+ANTHROPIC_WORKSPACE_ID = os.getenv('ANTHROPIC_WORKSPACE_ID', '')
 # Claude Sonnet 5 rejects non-default `temperature`/`top_p`/`top_k` and `budget_tokens` thinking, and runs adaptive
 # thinking by default (responses can start with a `thinking` block). Claude Haiku 4.5 still supports them
 ANTHROPIC_SONNET_MODEL = "claude-sonnet-5"

@@ -1,5 +1,6 @@
 from anthropic import Anthropic, AsyncAnthropic
 
+from commons.constants import ANTHROPIC_WORKSPACE_ID
 from commons.models.message import Message
 from commons.models.role import Role
 from t1_llm_api.base_client import AIClient
@@ -28,14 +29,13 @@ class AnthropicAIClient(AIClient):
             api_key (str): The Anthropic API key for authentication.
             system_prompt (str): The system instruction to guide Claude's behavior.
         """
-        #TODO:
-        # Call to __init__ of super class
-        # Add Anthropic and AsyncAnthropic clients https://github.com/anthropics/anthropic-sdk-python?tab=readme-ov-file#usage
-        # (In readme you can find samples with both of these clients)
-        # Useful links with request/response samples:
-        #   - https://docs.anthropic.com/en/api/overview
-        #   - https://docs.anthropic.com/en/api/messages
-        raise NotImplementedError
+        super().__init__(endpoint=endpoint, model_name=model_name, api_key=api_key, system_prompt=system_prompt)
+        # SDK appends "/v1/messages" itself, so it must not be part of base_url
+        base_url = endpoint.removesuffix("/v1/messages")
+        # Required only for API keys that are not scoped to a workspace
+        default_headers = {"anthropic-workspace-id": ANTHROPIC_WORKSPACE_ID} if ANTHROPIC_WORKSPACE_ID else None
+        self._client = Anthropic(api_key=api_key, base_url=base_url, default_headers=default_headers)
+        self._async_client = AsyncAnthropic(api_key=api_key, base_url=base_url, default_headers=default_headers)
 
     def response(self, messages: list[Message], **kwargs) -> Message:
         """
@@ -53,12 +53,16 @@ class AnthropicAIClient(AIClient):
             Response content blocks are concatenated into a single text response.
             The response is printed to stdout before being returned.
         """
-        #TODO:
-        # - Add System prompt
-        # - Call client
-        # - Print response to console
-        # - Return ASSISTANT message
-        raise NotImplementedError
+        kwargs.setdefault("max_tokens", 1024)
+        result = self._client.messages.create(
+            model=self._model_name,
+            system=self._system_prompt,
+            messages=[message.to_dict() for message in messages],
+            **kwargs
+        )
+        content = "".join(block.text for block in result.content if block.type == "text")
+        print(content)
+        return Message(role=Role.ASSISTANT, content=content)
 
     async def stream_response(self, messages: list[Message], **kwargs) -> Message:
         """
@@ -78,10 +82,18 @@ class AnthropicAIClient(AIClient):
             Listens for 'content_block_delta' events with text deltas.
             Each delta is printed to stdout as it arrives for real-time display.
         """
-        #TODO:
-        # - Add System prompt
-        # - Call client with streaming mode
-        # - Handle stream with chunks
-        # - Print response to console
-        # - Return ASSISTANT message
-        raise NotImplementedError
+        kwargs.setdefault("max_tokens", 1024)
+        content = ""
+        async with self._async_client.messages.stream(
+            model=self._model_name,
+            system=self._system_prompt,
+            messages=[message.to_dict() for message in messages],
+            **kwargs
+        ) as stream:
+            async for event in stream:
+                if event.type == "content_block_delta" and event.delta.type == "text_delta":
+                    content += event.delta.text
+                    print(event.delta.text, end="", flush=True)
+        print()
+
+        return Message(role=Role.ASSISTANT, content=content)
