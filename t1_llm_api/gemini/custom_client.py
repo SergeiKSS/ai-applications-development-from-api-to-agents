@@ -36,15 +36,35 @@ class CustomGeminiAIClient(AIClient):
             Uses 'x-goog-api-key' header for authentication.
             Response candidates contain content parts that are concatenated.
         """
-        #TODO:
-        # https://ai.google.dev/gemini-api/docs/text-generation
-        # - Prepare headers with api key and content type
-        # - Add System prompt
-        # - Execute post request to AI API (use `requests`)
-        # - Parse response
-        # - Print response to console
-        # - Return ASSISTANT message
-        raise NotImplementedError
+        headers = {
+            "x-goog-api-key": self._api_key,
+            "Content-Type": "application/json",
+        }
+        kwargs.setdefault("maxOutputTokens", 1024)
+        payload = {
+            "system_instruction": {"parts": [{"text": self._system_prompt}]},
+            "contents": [
+                {
+                    "role": "model" if message.role == Role.ASSISTANT else "user",
+                    "parts": [{"text": message.content}],
+                }
+                for message in messages
+            ],
+            "generationConfig": kwargs,
+        }
+
+        url = f"{self._endpoint}/{self._model_name}:generateContent"
+        http_response = requests.post(url=url, headers=headers, json=payload)
+        http_response.raise_for_status()
+        data = http_response.json()
+
+        candidates = data.get("candidates")
+        if not candidates:
+            raise ValueError("API response contains no candidates")
+
+        content = "".join(part.get("text", "") for part in candidates[0]["content"]["parts"])
+        print(content)
+        return Message(role=Role.ASSISTANT, content=content)
 
     async def stream_response(self, messages: list[Message], **kwargs) -> Message:
         """
@@ -66,13 +86,43 @@ class CustomGeminiAIClient(AIClient):
             Each SSE chunk contains candidates with content parts.
             Each text chunk is printed to stdout as it arrives.
         """
-        #TODO:
-        # https://ai.google.dev/gemini-api/docs/text-generation
-        # - Prepare headers with api key and content type
-        # - Add System prompt
-        # - Execute post request to AI API (use `aiohttp`)
-        # - Handle stream with chunks
-        # - Parse response
-        # - Print chunks to console
-        # - Return ASSISTANT message
-        raise NotImplementedError
+        headers = {
+            "x-goog-api-key": self._api_key,
+            "Content-Type": "application/json",
+        }
+        kwargs.setdefault("maxOutputTokens", 1024)
+        payload = {
+            "system_instruction": {"parts": [{"text": self._system_prompt}]},
+            "contents": [
+                {
+                    "role": "model" if message.role == Role.ASSISTANT else "user",
+                    "parts": [{"text": message.content}],
+                }
+                for message in messages
+            ],
+            "generationConfig": kwargs,
+        }
+
+        url = f"{self._endpoint}/{self._model_name}:streamGenerateContent?alt=sse"
+        content = ""
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url=url, headers=headers, json=payload) as http_response:
+                http_response.raise_for_status()
+                async for line in http_response.content:
+                    line = line.decode("utf-8").strip()
+                    if not line.startswith("data: "):
+                        continue
+
+                    chunk = json.loads(line.removeprefix("data: "))
+                    candidates = chunk.get("candidates")
+                    if not candidates:
+                        continue
+
+                    for part in candidates[0]["content"]["parts"]:
+                        text = part.get("text", "")
+                        if text:
+                            content += text
+                            print(text, end="", flush=True)
+        print()
+
+        return Message(role=Role.ASSISTANT, content=content)

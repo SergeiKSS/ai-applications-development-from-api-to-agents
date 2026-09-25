@@ -28,10 +28,8 @@ class GeminiAIClient(AIClient):
             api_key (str): The Google API key for authentication.
             system_prompt (str): The system instruction to guide the model's behavior.
         """
-        #TODO:
-        # Call to __init__ of super class
-        # Add genai.Client https://ai.google.dev/gemini-api/docs/text-generation#python_4
-        raise NotImplementedError
+        super().__init__(endpoint=endpoint, model_name=model_name, api_key=api_key, system_prompt=system_prompt)
+        self._client = genai.Client(api_key=api_key)
 
     def response(self, messages: list[Message], **kwargs) -> Message:
         """
@@ -48,12 +46,23 @@ class GeminiAIClient(AIClient):
             Gemini uses 'system_instruction' parameter for system-level guidance.
             The response is printed to stdout before being returned.
         """
-        #TODO:
-        # - Add System prompt
-        # - Call client
-        # - Print response to console
-        # - Return ASSISTANT message
-        raise NotImplementedError
+        kwargs.setdefault("max_output_tokens", 1024)
+        contents = [
+            types.Content(
+                role="model" if message.role == Role.ASSISTANT else "user",
+                parts=[types.Part.from_text(text=message.content)],
+            )
+            for message in messages
+        ]
+
+        result = self._client.models.generate_content(
+            model=self._model_name,
+            contents=contents,
+            config=types.GenerateContentConfig(system_instruction=self._system_prompt, **kwargs),
+        )
+        content = result.text
+        print(content)
+        return Message(role=Role.ASSISTANT, content=content)
 
     async def stream_response(self, messages: list[Message], **kwargs) -> Message:
         """
@@ -73,10 +82,25 @@ class GeminiAIClient(AIClient):
             Uses the async streaming interface provided by the Gemini SDK.
             Each chunk's text is printed to stdout as it arrives.
         """
-        #TODO:
-        # - Add System prompt
-        # - Call client with streaming mode
-        # - Handle stream with chunks
-        # - Print response to console
-        # - Return ASSISTANT message
-        raise NotImplementedError
+        kwargs.setdefault("max_output_tokens", 1024)
+        contents = [
+            types.Content(
+                role="model" if message.role == Role.ASSISTANT else "user",
+                parts=[types.Part.from_text(text=message.content)],
+            )
+            for message in messages
+        ]
+
+        content = ""
+        stream = self._client.aio.models.generate_content_stream(
+            model=self._model_name,
+            contents=contents,
+            config=types.GenerateContentConfig(system_instruction=self._system_prompt, **kwargs),
+        )
+        async for chunk in stream:
+            if chunk.text:
+                content += chunk.text
+                print(chunk.text, end="", flush=True)
+        print()
+
+        return Message(role=Role.ASSISTANT, content=content)
