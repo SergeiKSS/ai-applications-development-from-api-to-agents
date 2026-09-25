@@ -13,15 +13,19 @@ import os
 DEFAULT_SYSTEM_PROMPT = "You are an assistant who answers concisely and informatively."
 
 # OpenAI API configuration
-OPENAI_HOST = "https://api.openai.com"
-OPENAI_CHAT_COMPLETIONS_ENDPOINT = f"{OPENAI_HOST}/v1/chat/completions"
-OPENAI_RESPONSES_ENDPOINT = f"{OPENAI_HOST}/v1/responses"
+# OPENAI_HOST = "https://api.openai.com"
+OPENAI_HOST = "https://ai-proxy.lab.epam.com"
+# OPENAI_CHAT_COMPLETIONS_ENDPOINT = f"{OPENAI_HOST}/v1/chat/completions"
+OPENAI_CHAT_COMPLETIONS_ENDPOINT = f"{OPENAI_HOST}/openai/deployments/gpt-5.6-terra-2026-07-09"
+# OPENAI_RESPONSES_ENDPOINT = f"{OPENAI_HOST}/v1/responses"
+OPENAI_RESPONSES_ENDPOINT = f"{OPENAI_HOST}/openai/v1/responses"
 OPENAI_EMBEDDINGS_ENDPOINT = f"{OPENAI_HOST}/v1/embeddings"
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
 # GPT-5.6 family: gpt-5.6-sol (flagship), gpt-5.6-terra (mini tier), gpt-5.6-luna (nano tier).
 # They are reasoning models: a non-default `temperature`/`top_p` works only with `reasoning_effort="none"`,
 # `max_completion_tokens` replaces `max_tokens`, and `stop`/`presence_penalty` are not supported
-OPENAI_TERRA_MODEL = "gpt-5.6-terra"
+# OPENAI_TERRA_MODEL = "gpt-5.6-terra"
+OPENAI_TERRA_MODEL = "gpt-5.6-terra-2026-07-09"
 OPENAI_LUNA_MODEL = "gpt-5.6-luna"
 OPENAI_EMBEDDINGS_MODEL = "text-embedding-3-small"
 

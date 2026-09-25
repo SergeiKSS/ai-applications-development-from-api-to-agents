@@ -35,15 +35,28 @@ class CustomOpenAIClient(BaseOpenAIClient):
             The system prompt is automatically prepended to the messages.
             The response is printed to stdout before being returned.
         """
-        #TODO:
-        # https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create
-        # - Prepare headers with authorization and content type
-        # - Prepare message history with System prompt
-        # - Execute post request to AI API (use `requests`)
-        # - Parse response
-        # - Print response to console
-        # - Return ASSISTANT message
-        raise NotImplementedError
+        headers = {
+            "Authorization": self._api_key,
+            "Content-Type": "application/json",
+        }
+        full_messages = [Message(role=Role.SYSTEM, content=self._system_prompt), *messages]
+        payload = {
+            "model": self._model_name,
+            "messages": [message.to_dict() for message in full_messages],
+            **kwargs,
+        }
+
+        http_response = requests.post(url=f"{self._endpoint}/chat/completions", headers=headers, json=payload)
+        http_response.raise_for_status()
+        data = http_response.json()
+
+        choices = data.get("choices")
+        if not choices:
+            raise ValueError("API response contains no choices")
+
+        content = choices[0]["message"]["content"]
+        print(content)
+        return Message(role=Role.ASSISTANT, content=content)
 
     async def stream_response(self, messages: list[Message], **kwargs) -> Message:
         """
@@ -64,13 +77,36 @@ class CustomOpenAIClient(BaseOpenAIClient):
             Each token is printed to stdout as it arrives.
             Uses Server-Sent Events (SSE) format where each line starts with "data: ".
         """
-        #TODO:
-        # https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create (Streaming tab)
-        # - Prepare headers with authorization and content type
-        # - Prepare message history with System prompt
-        # - Execute post request to AI API (use `aihttp`)
-        # - Handle stream with chunks
-        # - Parse response
-        # - Print chunks to console
-        # - Return ASSISTANT message
-        raise NotImplementedError
+        headers = {
+            "Authorization": self._api_key,
+            "Content-Type": "application/json",
+        }
+        full_messages = [Message(role=Role.SYSTEM, content=self._system_prompt), *messages]
+        payload = {
+            "model": self._model_name,
+            "messages": [message.to_dict() for message in full_messages],
+            "stream": True,
+            **kwargs,
+        }
+
+        content = ""
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url=f"{self._endpoint}/chat/completions", headers=headers, json=payload) as http_response:
+                http_response.raise_for_status()
+                async for line in http_response.content:
+                    line = line.decode("utf-8").strip()
+                    if not line.startswith("data: "):
+                        continue
+
+                    data = line.removeprefix("data: ")
+                    if data == "[DONE]":
+                        break
+
+                    chunk = json.loads(data)
+                    delta = chunk["choices"][0]["delta"].get("content")
+                    if delta:
+                        content += delta
+                        print(delta, end="", flush=True)
+        print()
+
+        return Message(role=Role.ASSISTANT, content=content)
