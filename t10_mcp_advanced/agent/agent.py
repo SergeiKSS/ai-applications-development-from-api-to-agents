@@ -4,6 +4,7 @@ from typing import Any
 
 from openai import AsyncOpenAI
 
+from commons.constants import OPENAI_HOST
 from commons.models.message import Message
 from commons.models.role import Role
 from t10_mcp_advanced.agent.clients.custom_mcp_client import CustomMCPClient
@@ -23,7 +24,9 @@ class CustomAgentMCP:
         self.model = model
         self.tools = tools
         self.tool_name_client_map = tool_name_client_map
-        self.openai = AsyncOpenAI(api_key=api_key)
+        # The proxy uses DIAL-style deployment routing (same convention as OPENAI_CHAT_COMPLETIONS_ENDPOINT).
+        # The SDK appends "/chat/completions" itself, so it must not be part of base_url.
+        self.openai = AsyncOpenAI(api_key=api_key, base_url=f"{OPENAI_HOST}/openai/deployments/{model}")
 
     def _collect_tool_calls(self, tool_deltas):
         """Convert streaming tool call deltas to complete tool calls"""
