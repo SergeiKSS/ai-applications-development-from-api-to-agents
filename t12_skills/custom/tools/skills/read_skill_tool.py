@@ -13,24 +13,34 @@ class ReadSkillTool(BaseTool):
 
     @property
     def name(self) -> str:
-        #TODO: Return the tool name
-        raise NotImplementedError()
+        return "read_skill"
 
     @property
     def description(self) -> str:
-        #TODO: Return a description telling the agent when and how to use this tool
-        #      (what it reads, what path format to use)
-        raise NotImplementedError()
+        return (
+            "Reads a file from the local skills directory (SKILL.md, scripts, references, assets). "
+            "Use it to load a skill's SKILL.md before following its instructions, and to read any "
+            "additional file it references. The path is relative to the skills root and must start "
+            "with a '/', e.g. path=\"/calculator/SKILL.md\" or path=\"/calculator/scripts/calculate.py\"."
+        )
 
     @property
     def parameters(self) -> dict[str, Any]:
-        #TODO: Return the JSON schema for the tool parameters
-        #      Single required string parameter "path" with a description of the expected format
-        raise NotImplementedError()
+        return {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": (
+                        "Path to the file to read, relative to the skills root, starting with '/' "
+                        "(e.g. '/<skill-name>/SKILL.md' or '/<skill-name>/scripts/<file>')."
+                    ),
+                }
+            },
+            "required": ["path"],
+        }
 
     async def _execute(self, arguments: dict[str, Any]) -> str:
-        #TODO:
-        # - Get the path from arguments and strip the leading "/"
-        # - Resolve the full filesystem path by combining self._skills_dir with the relative path
-        # - Return the file content using `get_file_content` method
-        raise NotImplementedError()
+        relative_path = arguments["path"].lstrip("/")
+        full_path = self._skills_dir / relative_path
+        return get_file_content(full_path)

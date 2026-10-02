@@ -21,10 +21,13 @@ class PythonCodeInterpreterTool(BaseTool):
         self._skills_dir = skills_dir
 
         self._code_execute_tool: Optional[MCPToolModel] = None
-        #TODO:
-        # - Iterate over mcp_tool_models and assign the one matching tool_name to self._code_execute_tool
-        # - If not found, raise ValueError listing the available tool names
-        raise NotImplementedError()
+        for tool in mcp_tool_models:
+            if tool.name == tool_name:
+                self._code_execute_tool = tool
+                break
+        if self._code_execute_tool is None:
+            available = [tool.name for tool in mcp_tool_models]
+            raise ValueError(f"Tool '{tool_name}' not found. Available tools: {available}")
 
     @classmethod
     async def create(
@@ -34,40 +37,44 @@ class PythonCodeInterpreterTool(BaseTool):
             skills_dir: Path
     ) -> 'PythonCodeInterpreterTool':
         """Async factory method to create PythonCodeInterpreterTool."""
-        #TODO:
-        # - Create a T12MCPClient by connecting to mcp_url (use T12MCPClient.create)
-        # - Fetch the available tools from the MCP client
-        # - Instantiate and return cls with the client, tools, tool_name, and skills_dir
-        raise NotImplementedError()
+        mcp_client = await T12MCPClient.create(mcp_url)
+        mcp_tool_models = await mcp_client.get_tools()
+        return cls(mcp_client, mcp_tool_models, tool_name, skills_dir)
 
     @property
     def name(self) -> str:
-        #TODO: Return the tool name from self._code_execute_tool
-        raise NotImplementedError()
+        return self._code_execute_tool.name
 
     @property
     def description(self) -> str:
-        #TODO: Return the tool description from self._code_execute_tool
-        raise NotImplementedError()
+        return self._code_execute_tool.description
 
     @property
     def parameters(self) -> dict[str, Any]:
-        #TODO:
-        # - Start from self._code_execute_tool.parameters (spread it into a new dict)
-        # - Add an extra optional string property "script_path" describing that the tool
-        #   will prepend the file content to the code before execution
-        # - Return the extended parameters dict
-        raise NotImplementedError()
+        parameters = {**self._code_execute_tool.parameters}
+        properties = {**parameters.get("properties", {})}
+        properties["script_path"] = {
+            "type": "string",
+            "description": (
+                "Optional path (relative to the skills root, e.g. '/<skill-name>/scripts/<file>') "
+                "of a script whose content is prepended to `code` before execution."
+            ),
+        }
+        parameters["properties"] = properties
+        return parameters
 
     async def _execute(self, arguments: dict[str, Any]) -> str:
-        #TODO:
-        # - If arguments contains a non-empty "script_path":
-        #   - Resolve the full path by combining self._skills_dir with the stripped script_path
-        #   - Read the script content using `get_file_content` method
-        #   - Build args with "code" = script_content + "\n\n" + arguments["code"]
-        #     and "session_id" = arguments.get("session_id", "")
-        # - Otherwise use arguments directly as args
-        # - Call self._mcp_client.call_tool with the tool name and args
-        # - Parse the returned content into _ExecutionResult using model_validate_json
-        # - Return the result serialized as JSON using model_dump_json
-        raise NotImplementedError()
+        script_path = arguments.get("script_path")
+        if script_path:
+            full_path = self._skills_dir / script_path.lstrip("/")
+            script_content = get_file_content(full_path)
+            args = {
+                "code": f"{script_content}\n\n{arguments['code']}",
+                "session_id": arguments.get("session_id", ""),
+            }
+        else:
+            args = arguments
+
+        content = await self._mcp_client.call_tool(self.name, args)
+        result = _ExecutionResult.model_validate_json(content)
+        return result.model_dump_json()

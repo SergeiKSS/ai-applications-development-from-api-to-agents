@@ -2,9 +2,9 @@ import asyncio
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from openai import OpenAI
+from openai import AsyncOpenAI
 
-from commons.constants import OPENAI_API_KEY, OPENAI_TERRA_MODEL
+from commons.constants import OPENAI_API_KEY, OPENAI_HOST, OPENAI_TERRA_MODEL
 from commons.models.message import Message
 from commons.models.role import Role
 from t12_skills.custom.agent import T12Agent
@@ -66,15 +66,28 @@ async def main():
     system_prompt = build_system_prompt(skills)
     print(f"📄 System prompt: \n {system_prompt}")
 
-    #TODO:
-    # - Initialize the messages list with a SYSTEM message containing the system_prompt
-    # - Build the tools list:
-    #   - ReadSkillTool (pass SKILLS_DIR)
-    #   - PythonCodeInterpreterTool (use async factory .create() with MCP_URL, MCP_TOOL_NAME, SKILLS_DIR)
-    # - Create a T12Agent with an OpenAI client, model OPENAI_TERRA_MODEL, and the tools list
-    # - Run a chat loop: read user input, break on "exit",
-    #   append USER message, call agent.chat_completion, append the returned assistant message
-    raise NotImplementedError()
+    messages: list[Message] = [Message(role=Role.SYSTEM, content=system_prompt)]
+
+    tools: list[BaseTool] = [
+        ReadSkillTool(SKILLS_DIR),
+        await PythonCodeInterpreterTool.create(MCP_URL, MCP_TOOL_NAME, SKILLS_DIR),
+    ]
+
+    # The proxy uses DIAL-style deployment routing; the SDK appends "/chat/completions" itself.
+    client = AsyncOpenAI(api_key=OPENAI_API_KEY, base_url=f"{OPENAI_HOST}/openai/deployments/{OPENAI_TERRA_MODEL}")
+    agent = T12Agent(client=client, model=OPENAI_TERRA_MODEL, tools=tools)
+
+    print("\n🤖 Agent is ready. Type your query or 'exit' to quit.\n")
+    while True:
+        user_input = input("> ").strip()
+        if user_input.lower() == "exit":
+            break
+        if not user_input:
+            continue
+
+        messages.append(Message(role=Role.USER, content=user_input))
+        ai_message = await agent.chat_completion(messages)
+        messages.append(ai_message)
 
 
 if __name__ == "__main__":
