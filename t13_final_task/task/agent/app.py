@@ -20,31 +20,50 @@ from t13_final_task.task.agent.tools.mcp_tool import McpTool
 from t13_final_task.task.agent.tools.read_skill_tool import ReadSkillTool
 from t13_final_task.task.agent.ums_agent import UMSAgent
 from t13_final_task.task.agent.models import SkillMetadata, load_skills, Message
+from commons.constants import OPENAI_API_KEY, OPENAI_TERRA_MODEL
 
 SKILLS_DIR = Path(__file__).parent.parent / "_skills"
+UMS_MCP_SERVER_URL = "http://localhost:8005/mcp"
+DDG_MCP_DOCKER_IMAGE = "khshanovskyi/ddg-mcp-server:latest"
 
 
 def _build_available_skills_xml(skills: list[SkillMetadata]) -> str:
-    #TODO:
-    # Build and return an XML string with root element <available_skills>.
-    # For each skill add a <skill name="..."> element with child elements:
-    #   - <description> (always)
-    #   - <license> (if present)
-    #   - <compatibility> (if present)
-    #   - <metadata> with a dynamic child element per key/value pair (if present)
-    #   - <allowed-tools> as a space-joined string (if present)
-    raise NotImplementedError()
+    root = ET.Element("available_skills")
+
+    for skill in skills:
+        skill_el = ET.SubElement(root, "skill", name=skill.name)
+
+        description_el = ET.SubElement(skill_el, "description")
+        description_el.text = skill.description
+
+        if skill.license:
+            ET.SubElement(skill_el, "license").text = skill.license
+
+        if skill.compatibility:
+            ET.SubElement(skill_el, "compatibility").text = skill.compatibility
+
+        if skill.metadata:
+            metadata_el = ET.SubElement(skill_el, "metadata")
+            for key, value in skill.metadata.items():
+                ET.SubElement(metadata_el, key).text = str(value)
+
+        if skill.allowed_tools:
+            ET.SubElement(skill_el, "allowed-tools").text = " ".join(skill.allowed_tools)
+
+    return ET.tostring(root, encoding="unicode")
 
 
 def build_system_prompt(skills: list[SkillMetadata]) -> str:
-    #TODO:
-    # Build and return the system prompt string that:
-    #   - Describes the assistant as an AI with access to agent skills
-    #   - Embeds the XML from _build_available_skills_xml(skills)
-    #   - Explains how to use skills:
-    #       1. Call `read_skill` with path="/<skill-name>/SKILL.md" to load instructions
-    #       2. Follow the loaded SKILL.md precisely
-    raise NotImplementedError()
+    skills_xml = _build_available_skills_xml(skills)
+    return (
+        "You are an AI assistant with access to Agent Skills — bundles of instructions that extend "
+        "your capabilities for specific tasks.\n\n"
+        "Available skills:\n"
+        f"{skills_xml}\n\n"
+        "To use a skill:\n"
+        "1. Call `read_skill` with path=\"/<skill-name>/SKILL.md\" to load its instructions.\n"
+        "2. Follow the loaded SKILL.md precisely for the rest of the task.\n"
+    )
 
 
 # Configure logging
@@ -66,33 +85,42 @@ async def lifespan(app: FastAPI):
     """Initialize MCP clients, Redis, and ConversationManager on startup"""
     global conversation_manager
 
-    #TODO:
-    # Startup:
-    # 1. Load skills from SKILLS_DIR with load_skills(), build system_prompt with build_system_prompt()
-    # 2. Create tools list starting with ReadSkillTool(skills_dir=SKILLS_DIR)
-    # 3. Init HttpMcpClient via HttpMcpClient.create() using http://localhost:8005/mcp URL, get its tools and append each as McpTool
-    # 4. Init StdioMcpClient with docker_image: "khshanovskyi/ddg-mcp-server:latest" get its tools and append each as McpTool
-    # 5. Create UMSAgent
-    # 6. Create redis.Redis client and ping it
-    # 7. Create ConversationManager
-    #    and assign to global conversation_manager
+    skills = load_skills(SKILLS_DIR)
+    system_prompt = build_system_prompt(skills)
+
+    tools: list[BaseTool] = [ReadSkillTool(skills_dir=SKILLS_DIR)]
+
+    ums_client = await HttpMcpClient.create(UMS_MCP_SERVER_URL)
+    for tool_model in await ums_client.get_tools():
+        tools.append(McpTool(client=ums_client, mcp_tool_model=tool_model))
+
+    ddg_client = await StdioMcpClient.create(DDG_MCP_DOCKER_IMAGE)
+    for tool_model in await ddg_client.get_tools():
+        tools.append(McpTool(client=ddg_client, mcp_tool_model=tool_model))
+
+    ums_agent = UMSAgent(api_key=OPENAI_API_KEY, model=OPENAI_TERRA_MODEL, tools=tools)
+
+    redis_client = redis.Redis(host="localhost", port=6379, decode_responses=True)
+    await redis_client.ping()
+
+    conversation_manager = ConversationManager(
+        ums_agent=ums_agent,
+        redis_client=redis_client,
+        system_prompt=system_prompt,
+    )
 
     yield
 
-    #TODO: shutdown — close redis_client
+    await redis_client.close()
 
 
-app = FastAPI(
-    #TODO: add `lifespan` param from above
-)
+app = FastAPI(lifespan=lifespan)
 app.add_middleware(
-    #TODO:
-    # Since we will run it locally there will be some issues from FrontEnd side with CORS, and its okay for local setup to disable them:
-    #   - CORSMiddleware,
-    #   - allow_origins=["*"]
-    #   - allow_credentials=True
-    #   - allow_methods=["*"]
-    #   - allow_headers=["*"]
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
@@ -129,27 +157,46 @@ async def health():
         "conversation_manager_initialized": conversation_manager is not None
     }
 
-#TODO:
-# Create such endpoints:
-# 1. POST: "/conversations". Applies CreateConversationRequest and creates new conversation with ConversationManager.
-# 2. GET: "/conversations" Extracts all conversation from storage. Returns list of ConversationSummary objects
-# 3. GET: "/conversations/{conversation_id}". Applies conversation_id string and extracts from storage full conversation
-# 4. DELETE: "/conversations/{conversation_id}". Applies conversation_id string and deletes conversation. Returns dict
-#    with message with info if conversation has been deleted
-# 5. POST: "/conversations/{conversation_id}/chat". Chat endpoint that processes messages and returns assistant response.
-#    Supports both streaming and non-streaming modes.
-#    Applies conversation_id and ChatRequest.
-#    If `request.stream` then return `StreamingResponse(result, media_type="text/event-stream")`, otherwise return `ChatResponse(**result)`
+@app.post("/conversations")
+async def create_conversation(request: CreateConversationRequest):
+    return await conversation_manager.create_conversation(request.title)
 
+
+@app.get("/conversations")
+async def list_conversations() -> list[ConversationSummary]:
+    return await conversation_manager.list_conversations()
+
+
+@app.get("/conversations/{conversation_id}")
+async def get_conversation(conversation_id: str):
+    conversation = await conversation_manager.get_conversation(conversation_id)
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return conversation
+
+
+@app.delete("/conversations/{conversation_id}")
+async def delete_conversation(conversation_id: str):
+    deleted = await conversation_manager.delete_conversation(conversation_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return {"message": f"Conversation '{conversation_id}' deleted"}
+
+
+@app.post("/conversations/{conversation_id}/chat")
+async def chat(conversation_id: str, request: ChatRequest):
+    result = await conversation_manager.chat(request.message, conversation_id, stream=request.stream)
+    if request.stream:
+        return StreamingResponse(result, media_type="text/event-stream")
+    return ChatResponse(**result)
 
 
 if __name__ == "__main__":
     import uvicorn
     logger.info("Starting uvicorn server")
     uvicorn.run(
-        #TODO:
-        #  - app
-        #  - host="0.0.0.0"
-        #  - port=8011
-        #  - log_level="debug"
+        app,
+        host="0.0.0.0",
+        port=8011,
+        log_level="debug"
     )

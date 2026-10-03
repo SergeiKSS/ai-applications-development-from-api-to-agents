@@ -33,8 +33,10 @@ class StdioMcpClient(BaseMcpClient):
     async def connect(self):
         """Connect to MCP server via Docker"""
         server_params = StdioServerParameters(
-            command="docker",
-            args=["run", "--rm", "-i", self.docker_image]
+            command="podman",
+            # --platform=linux/amd64: this image's native arm64 build crashes with SIGILL on
+            # Apple Silicon under podman; the amd64 build runs fine through emulation.
+            args=["run", "--rm", "-i", "--platform=linux/amd64", self.docker_image]
         )
 
         logger.info("Starting Docker container for MCP", extra={"docker_image": self.docker_image})
@@ -69,7 +71,7 @@ class StdioMcpClient(BaseMcpClient):
             McpToolModel(
                 name=tool.name,
                 description=tool.description,
-                parameters=tool.inputSchema,
+                parameters=tool.input_schema,
             )
             for tool in tools_result.tools
         ]

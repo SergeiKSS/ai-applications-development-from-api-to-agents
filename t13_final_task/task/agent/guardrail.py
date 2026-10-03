@@ -163,15 +163,23 @@ class UMSDataGuardrail:
 
     @staticmethod
     def _build_analyzer() -> AnalyzerEngine:
-        #TODO:
-        # - Create NlpEngineProvider with _NLP_CONFIG, build AnalyzerEngine from it
-        # - Register _UMSCreditCardRecognizer and _UMSSalaryRecognizer
-        # - Return analyzer
-        raise NotImplementedError()
+        provider = NlpEngineProvider(nlp_configuration=_NLP_CONFIG)
+        nlp_engine = provider.create_engine()
+
+        analyzer = AnalyzerEngine(nlp_engine=nlp_engine)
+        analyzer.registry.add_recognizer(_UMSCreditCardRecognizer())
+        analyzer.registry.add_recognizer(_UMSSalaryRecognizer())
+        return analyzer
 
     def redact(self, text: str) -> str:
         """Redact credit card and salary data via Presidio analyze → anonymize pipeline."""
-        #TODO:
-        # - Analyze text for _ENTITIES; return text unchanged if no results
-        # - Anonymize with _OPERATORS, return anonymized.text
-        raise NotImplementedError()
+        results = self.analyzer.analyze(text=text, entities=self._ENTITIES, language="en")
+        if not results:
+            return text
+
+        anonymized = self.anonymizer.anonymize(
+            text=text,
+            analyzer_results=results,
+            operators=self._OPERATORS,
+        )
+        return anonymized.text

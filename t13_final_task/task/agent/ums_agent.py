@@ -5,6 +5,7 @@ from typing import AsyncGenerator
 
 from openai import AsyncOpenAI
 
+from commons.constants import OPENAI_HOST
 from t13_final_task.task.agent.models import Message
 from t13_final_task.task.agent.models import Role
 from t13_final_task.task.agent.guardrail import UMSDataGuardrail
@@ -22,63 +23,132 @@ class UMSAgent:
             model: str,
             tools: list[BaseTool]
     ):
-        #TODO:
-        # - Store tools as dict `tool.name: tool`
-        # - Store tools schemas list
-        # - Store model
-        # - Init AsyncOpenAI
-        # - Init UMSDataGuardrail
-        raise NotImplementedError()
+        self.tools: dict[str, BaseTool] = {tool.name: tool for tool in tools}
+        self.tools_schemas: list[dict] = [tool.schema for tool in tools]
+        self.model = model
+        # The SDK appends "/chat/completions" itself, so it must not be part of base_url.
+        self.async_openai = AsyncOpenAI(api_key=api_key, base_url=f"{OPENAI_HOST}/openai/deployments/{model}")
+        self.guardrail = UMSDataGuardrail()
 
     async def response(self, messages: list[Message]) -> Message:
         """Non-streaming completion with tool calling support"""
-        #TODO:
-        # 1. Build request_data: model, messages (each .to_dict()), tools schemas, stream=False
-        #    (if you use a GPT-5.6 model, also add reasoning_effort="none": it supports function tools in Chat Completions only without reasoning)
-        # 2. Call async_openai chat completions with request_data
-        # 3. Build ai_message (Role.ASSISTANT) from response content
-        # 4. If response has tool_calls, assign them to ai_message.tool_calls
-        # 5. If ai_message has tool_calls: append ai_message to messages, call _call_tools(),
-        #    then make recursive call
-        # 6. Return ai_message
-        raise NotImplementedError()
+        request_data = {
+            "model": self.model,
+            "messages": [m.to_dict() for m in messages],
+            "tools": self.tools_schemas,
+            "stream": False,
+        }
+        if "gpt-5.6" in self.model:
+            request_data["reasoning_effort"] = "none"
+
+        completion = await self.async_openai.chat.completions.create(**request_data)
+        choice_message = completion.choices[0].message
+
+        ai_message = Message(role=Role.ASSISTANT, content=choice_message.content or "")
+        if choice_message.tool_calls:
+            ai_message.tool_calls = [tc.model_dump() for tc in choice_message.tool_calls]
+
+        if ai_message.tool_calls:
+            messages.append(ai_message)
+            await self._call_tools(ai_message, messages)
+            return await self.response(messages)
+
+        return ai_message
 
     async def stream_response(self, messages: list[Message]) -> AsyncGenerator[str, None]:
         """
         Streaming completion with tool calling support.
         Yields SSE-formatted chunks.
         """
-        #TODO:
-        # 1. Build request_data: model, messages (each .to_dict()), tools schemas, stream=True
-        # 2. Stream via async_openai chat completions; buffer content and tool_deltas per chunk
-        # 3. If tool_deltas after stream:
-        #    - Collect tool_calls via _collect_tool_calls(), build ai_message, append to messages
-        #    - Notify frontend about each tool call (type: "call") and result (type: "result") via SSE
-        #    - Recursively yield from self.stream_response(messages), then return
-        # 4. If no tool calls: append final assistant message
-        # 5. Yield final SSE chunk with finish_reason="stop", then yield "data: [DONE]\n\n"
-        raise NotImplementedError()
+        request_data = {
+            "model": self.model,
+            "messages": [m.to_dict() for m in messages],
+            "tools": self.tools_schemas,
+            "stream": True,
+        }
+        if "gpt-5.6" in self.model:
+            request_data["reasoning_effort"] = "none"
+
+        stream = await self.async_openai.chat.completions.create(**request_data)
+
+        buffered_content = ""
+        tool_deltas = []
+
+        async for chunk in stream:
+            delta = chunk.choices[0].delta
+
+            if delta.content:
+                buffered_content += delta.content
+            if delta.tool_calls:
+                tool_deltas.extend(delta.tool_calls)
+
+            yield f"data: {json.dumps(chunk.model_dump())}\n\n"
+
+        if tool_deltas:
+            tool_calls = self._collect_tool_calls(tool_deltas)
+            ai_message = Message(role=Role.ASSISTANT, content=buffered_content, tool_calls=tool_calls)
+            messages.append(ai_message)
+
+            for tool_call in tool_calls:
+                tool_name = tool_call["function"]["name"]
+                raw_arguments = tool_call["function"]["arguments"]
+                arguments = json.loads(raw_arguments) if raw_arguments else {}
+
+                yield f"data: {json.dumps({'tool_activity': {'type': 'call', 'name': tool_name, 'arguments': arguments}})}\n\n"
+
+                single_call_message = Message(role=Role.ASSISTANT, content="", tool_calls=[tool_call])
+                await self._call_tools(single_call_message, messages, silent=True)
+                tool_message = messages[-1]
+
+                yield f"data: {json.dumps({'tool_activity': {'type': 'result', 'name': tool_name, 'content': tool_message.content}})}\n\n"
+
+            async for next_chunk in self.stream_response(messages):
+                yield next_chunk
+            return
+
+        messages.append(Message(role=Role.ASSISTANT, content=buffered_content))
+
+        yield f"data: {json.dumps({'choices': [{'delta': {}, 'finish_reason': 'stop'}]})}\n\n"
+        yield "data: [DONE]\n\n"
 
     def _collect_tool_calls(self, tool_deltas):
         """Convert streaming tool call deltas to complete tool calls"""
-        #TODO:
-        # 1. Use defaultdict keyed by delta.index; each entry has shape:
-        #    {"id": None, "function": {"arguments": "", "name": None}, "type": None}
-        # 2. For each delta: accumulate id, function.name, function.arguments (concatenate), type
-        # 3. Return list(tool_dict.values())
-        raise NotImplementedError()
+        tool_dict = defaultdict(lambda: {"id": None, "function": {"arguments": "", "name": None}, "type": None})
+
+        for delta in tool_deltas:
+            entry = tool_dict[delta.index]
+            if delta.id:
+                entry["id"] = delta.id
+            if delta.type:
+                entry["type"] = delta.type
+            if delta.function:
+                if delta.function.name:
+                    entry["function"]["name"] = delta.function.name
+                if delta.function.arguments:
+                    entry["function"]["arguments"] += delta.function.arguments
+
+        return list(tool_dict.values())
 
     async def _call_tools(self, ai_message: Message, messages: list[Message], silent: bool = False):
         """Execute tool calls using MCP client"""
-        #TODO:
-        # Iterate through tool_calls:
-        #   - Extract tool_name and arguments
-        #   - If tool found in self.tools:
-        #       - Execute tool call
-        #       - Append tool message to messages
-        #   - If tool not found: append a Tool Message error content and dont forget about tool_call_id
-        raise NotImplementedError()
+        for tool_call in ai_message.tool_calls:
+            tool_call_id = tool_call["id"]
+            tool_name = tool_call["function"]["name"]
+            raw_arguments = tool_call["function"]["arguments"]
+            arguments = json.loads(raw_arguments) if raw_arguments else {}
 
-        #TODO 2:
-        # Implement it ONLY after you started the app
-        # Make PII filtering for tool call result
+            tool = self.tools.get(tool_name)
+            if tool is None:
+                messages.append(Message(
+                    role=Role.TOOL,
+                    tool_call_id=tool_call_id,
+                    content=f"ERROR: tool '{tool_name}' not found",
+                ))
+                continue
+
+            if not silent:
+                logger.info("Executing tool call", extra={"tool_name": tool_name, "arguments": arguments})
+
+            tool_message = await tool.execute(tool_call_id, arguments)
+            tool_message.content = self.guardrail.redact(tool_message.content)
+            messages.append(tool_message)

@@ -31,7 +31,7 @@ class HttpMcpClient(BaseMcpClient):
         logger.info("Connecting to MCP server", extra={"server_url": self.server_url})
 
         self._streams_context = streamable_http_client(self.server_url)
-        read_stream, write_stream, _ = await self._streams_context.__aenter__()
+        read_stream, write_stream = await self._streams_context.__aenter__()
 
         self._session_context = ClientSession(read_stream, write_stream)
         self.session: ClientSession = await self._session_context.__aenter__()
@@ -57,7 +57,7 @@ class HttpMcpClient(BaseMcpClient):
             McpToolModel(
                 name=tool.name,
                 description=tool.description,
-                parameters=tool.inputSchema,
+                parameters=tool.input_schema,
             )
             for tool in tools.tools
         ]
